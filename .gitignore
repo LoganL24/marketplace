@@ -1,0 +1,12 @@
+# Python environment
+venv/
+__pycache__/
+*.pyc
+
+# Generated gRPC files (Your partner should generate their own)
+proto/src/marketplace_pb2.py
+proto/src/marketplace_pb2_grpc.py
+proto/src/marketplace_pb2.pyi
+
+# OS specific
+.DS_Store
