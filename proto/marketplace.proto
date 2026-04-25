@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package marketplace;
+
+message Item {
+    string id = 1;
+    string seller_id = 2;
+    string title = 3;
+    string category = 4;
+    string description = 5;
+    int32 starting_price = 6;
+    int32 current_price = 7;
+    int32 quantity = 8;
+    string status = 9;
+    int32 version = 10;
+}
