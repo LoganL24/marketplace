@@ -1,0 +1,157 @@
+syntax = "proto3";
+
+package marketplace;
+
+message Item {
+    string item_id = 1;
+    string seller_id = 2;
+    string title = 3;
+    string category = 4;
+    string description = 5;
+    float starting_price = 6;
+    float current_price = 7;
+    int32 quantity = 8;
+    string status = 9;
+    int32 version = 10;
+}
+
+service Marketplace {
+    rpc CreateItem (CreateItemRequest) returns (CreateItemResponse);
+    rpc GetItem (GetItemRequest) returns (GetItemResponse);
+    rpc SearchItems (SearchRequest) returns (SearchResponse);
+    rpc UpdateItem (UpdateItemRequest) returns (UpdateItemResponse);
+    rpc PlaceBid (BidRequest) returns (BidResponse);
+    rpc JoinAuction (AuctionRequest) returns (stream AuctionUpdate);
+}
+
+service StorageReplica {
+    rpc PutItem (PutRequest) returns (PutResponse);
+    rpc QueryItems (QueryRequest) returns (QueryResponse);
+    rpc SyncFullState (StateRequest) returns (StateResponse);
+    rpc ReplicateLog (ReplicationRequest) returns (ReplicationResponse);
+    rpc Heartbeat (HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+message CreateItemRequest {
+    Item item = 1;
+}
+
+message CreateItemResponse {
+    bool ok = 1;
+    string item_id = 2;
+    string message = 3;
+}
+
+message GetItemRequest {
+    string item_id = 1;
+}
+
+message GetItemResponse {
+    bool ok = 1;
+    Item item = 2;
+    string message = 3;
+}
+
+message SearchRequest {
+    string query = 1;
+    string category = 2;
+}
+
+message SearchResponse {
+    bool ok = 1;
+    repeated Item items = 2;
+    string message = 3;
+}
+
+message UpdateItemRequest {
+    string item_id = 1;
+    string seller_id = 2;
+    string description = 3;
+    int32 quantity = 4;
+    string status = 5;
+    int32 expected_version = 6;
+}
+
+message UpdateItemResponse {
+    bool ok = 1;
+    int32 new_version = 2;
+    string message = 3;
+}
+
+message BidRequest {
+    string item_id = 1;
+    string buyer_id = 2;
+    float amount = 3;
+    int32 expected_version = 4;
+}
+
+message BidResponse {
+    bool success = 1;
+    float current_price = 2;
+    int32 new_version = 3;
+    string message = 4;
+}
+
+message AuctionRequest {
+    string item_id = 1;
+    string user_id = 2;
+}
+
+message AuctionUpdate {
+    float current_price = 1;
+    string highest_bidder_id = 2;
+    int32 version = 3;
+    string message = 4;
+}
+
+message PutRequest {
+    Item item = 1;
+    bool is_update = 2;
+    bool skip_consistency_check = 3;
+}
+
+message PutResponse {
+    bool success = 1;
+    int32 current_version = 2;
+    string message = 3;
+}
+
+message QueryRequest {
+    string filter = 1;
+}
+
+message QueryResponse {
+    bool ok = 1;
+    repeated Item items = 2;
+    int32 items_found = 3;
+}
+
+message StateRequest {
+    string requester_id = 1;
+}
+
+message StateResponse {
+    bool ok = 1;
+    repeated Item items = 2;
+    int32 last_included_version = 3;
+}
+
+message ReplicationRequest {
+    Item item = 1;
+    string primary_id = 2;
+}
+
+message ReplicationResponse {
+    bool success = 1;
+    int32 ack_version = 2;
+}
+
+message HealthCheckRequest {
+    string request_source = 1;
+}
+
+message HealthCheckResponse {
+    bool alive = 1;
+    int32 item_count = 2;
+    string role = 3;
+}
