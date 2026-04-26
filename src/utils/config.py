@@ -1,0 +1,8 @@
+
+CONTROLLER_HOST = "host.docker.internal"
+CONTROLLER_PORT = 50050
+CONTROLLER_TARGET = f"{CONTROLLER_HOST}:{CONTROLLER_PORT}"
+
+NODE_PORT = 50051
+DOCKER_IMAGE = "marketplace-node:latest"
+DOCKER_NETWORK = "marketplace-network"

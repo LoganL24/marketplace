@@ -29,4 +29,14 @@ else
     sed -i 's/import marketplace_pb2/from . import marketplace_pb2/' "$OUT_DIR/marketplace_pb2_grpc.py"
 fi
 
+if ! grep -q '^import grpc.experimental$' "$OUT_DIR/marketplace_pb2_grpc.py"; then
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        sed -i '' '/^import grpc$/a\
+import grpc.experimental
+' "$OUT_DIR/marketplace_pb2_grpc.py"
+    else
+        sed -i '/^import grpc$/a import grpc.experimental' "$OUT_DIR/marketplace_pb2_grpc.py"
+    fi
+fi
+
 echo "Success! Files generated in $OUT_DIR"
