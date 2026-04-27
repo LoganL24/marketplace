@@ -7,7 +7,7 @@ import os
 
 from proto.src import marketplace_pb2, marketplace_pb2_grpc
 from proto.src.marketplace_pb2 import Item
-from utils.config import NODE_PORT
+from src.utils.config import NODE_PORT
 
 
 class StorageNode(marketplace_pb2_grpc.StorageReplicaServicer):
