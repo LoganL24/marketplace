@@ -32,6 +32,11 @@ service StorageReplica {
     rpc Heartbeat (HealthCheckRequest) returns (HealthCheckResponse);
 }
 
+service Controller {
+    rpc RegisterNode (RegisterRequest) returns (RegisterResponse);
+    rpc GetPrimary (GetPrimaryRequest) returns (GetPrimaryResponse);
+}
+
 message CreateItemRequest {
     Item item = 1;
 }
@@ -154,4 +159,23 @@ message HealthCheckResponse {
     bool alive = 1;
     int32 item_count = 2;
     string role = 3;
+}
+
+message RegisterRequest {
+    string address = 1;
+}
+
+message RegisterResponse {
+    bool success = 1;
+    bool is_primary = 2;
+}
+
+message GetPrimaryRequest {
+    string requester_id = 1;
+}
+
+message GetPrimaryResponse {
+    bool success = 1;
+    string primary_address = 2;
+    string message = 3;
 }
