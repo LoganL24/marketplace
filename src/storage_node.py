@@ -3,6 +3,8 @@ from concurrent import futures
 
 import grpc
 
+import os
+
 from proto.src import marketplace_pb2, marketplace_pb2_grpc
 from proto.src.marketplace_pb2 import Item
 from utils.config import NODE_PORT
@@ -13,11 +15,15 @@ class StorageNode(marketplace_pb2_grpc.StorageReplicaServicer):
         self.cv = threading.Condition()
         self.items_by_id: dict[str, Item] = {}
 
+        self.role = os.getenv("NODE_ROLE", "backup")
+        self.peer_addresses = os.getenv("PEER_ADDRESSES", "").split(",")
+
     def PutItem(self, request: marketplace_pb2.PutRequest, context) -> marketplace_pb2.PutResponse:
         with self.cv:
             item_id = request.item.item_id
             existing = self.items_by_id.get(item_id)
 
+            # Prevent older versions from overwriting newer data
             if existing and not request.skip_consistency_check:
                 if request.item.version <= existing.version:
                     return marketplace_pb2.PutResponse(
@@ -26,12 +32,47 @@ class StorageNode(marketplace_pb2_grpc.StorageReplicaServicer):
                         message="Stale write rejected",
                     )
 
+            # Local Save
             self.items_by_id[item_id] = request.item
+            print(f"[{self.role.upper()}] Saved item: {item_id} (v{request.item.version})")
+
+            # Active Replication 
+            # If we are the primary, we must push this to all backups
+            if self.role == "primary":
+                replication_success = self._propagate_to_backups(request.item)
+                if not replication_success:
+                    # delete the local copy if replication fails to maintain perfect sync
+                    return marketplace_pb2.PutResponse(
+                        success=False,
+                        current_version=request.item.version,
+                        message="Failed to replicate to backups",
+                    )
+
             return marketplace_pb2.PutResponse(
                 success=True,
                 current_version=request.item.version,
-                message="Item stored",
+                message=f"Item stored and replicated via {self.role}",
             )
+
+    def _propagate_to_backups(self, item: Item) -> bool:
+        """Helper to send the item to all peers listed in PEER_ADDRESSES"""
+        all_acks = True
+        for addr in self.peer_addresses:
+            if not addr.strip(): continue
+            try:
+                # short timeout so one slow backup doesn't hang the UI
+                with grpc.insecure_channel(addr) as channel:
+                    stub = marketplace_pb2_grpc.StorageReplicaStub(channel)
+                    repl_req = marketplace_pb2.ReplicationRequest(item=item)
+                    
+                    response = stub.ReplicateLog(repl_req, timeout=2.0)
+                    if not response.success:
+                        print(f"Backup {addr} rejected replication.")
+                        all_acks = False
+            except Exception as e:
+                print(f"Connection failed to backup {addr}: {e}")
+                all_acks = False
+        return all_acks
 
     def QueryItems(self, request: marketplace_pb2.QueryRequest, context) -> marketplace_pb2.QueryResponse:
         with self.cv:
