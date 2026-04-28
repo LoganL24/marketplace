@@ -36,7 +36,16 @@ service StorageReplica {
 service Controller {
     rpc RegisterNode (RegisterRequest) returns (RegisterResponse);
     rpc GetPrimary (GetPrimaryRequest) returns (GetPrimaryResponse);
+    rpc GetClusterInfo (ClusterInfoRequest) returns (ClusterInfoResponse);
 }
+
+message ClusterInfoRequest {}
+
+message ClusterInfoResponse {
+    bool success = 1;
+    repeated string node_addresses = 2;
+}
+
 
 message CreateItemRequest {
     Item item = 1;
