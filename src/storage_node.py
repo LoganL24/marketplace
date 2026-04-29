@@ -15,8 +15,22 @@ class StorageNode(marketplace_pb2_grpc.StorageReplicaServicer):
         self.cv = threading.Condition()
         self.items_by_id: dict[str, Item] = {}
 
+        self.port = os.getenv("NODE_PORT", "50051")
         self.role = os.getenv("NODE_ROLE", "backup")
         self.peer_addresses = os.getenv("PEER_ADDRESSES", "").split(",")
+
+        try:
+            with grpc.insecure_channel("localhost:50050") as channel:
+                stub = marketplace_pb2_grpc.ControllerStub(channel)
+                # Register with the controller
+                resp = stub.RegisterNode(marketplace_pb2.RegisterRequest(address=f"localhost:{self.port}"))
+                if resp.is_primary:
+                    self.role = "primary"
+                else:
+                    self.role = "backup"
+                print(f"Registered with Controller. Role assigned: {self.role.upper()}")
+        except Exception as e:
+            print(f"Could not connect to Controller: {e}. Defaulting to {self.role}")
 
     def PutItem(self, request: marketplace_pb2.PutRequest, context) -> marketplace_pb2.PutResponse:
         with self.cv:
@@ -39,7 +53,7 @@ class StorageNode(marketplace_pb2_grpc.StorageReplicaServicer):
             # Active Replication 
             # If we are the primary, we must push this to all backups
             if self.role == "primary":
-                replication_success = self._propagate_to_backups(request.item)
+                replication_success = self.PropagateToBackups(request.item)
                 if not replication_success:
                     # delete the local copy if replication fails to maintain perfect sync
                     return marketplace_pb2.PutResponse(
@@ -54,7 +68,7 @@ class StorageNode(marketplace_pb2_grpc.StorageReplicaServicer):
                 message=f"Item stored and replicated via {self.role}",
             )
 
-    def _propagate_to_backups(self, item: Item) -> bool:
+    def PropagateToBackups(self, item: Item) -> bool:
         """Helper to send the item to all peers listed in PEER_ADDRESSES"""
         all_acks = True
         for addr in self.peer_addresses:
@@ -125,8 +139,14 @@ class StorageNode(marketplace_pb2_grpc.StorageReplicaServicer):
             return marketplace_pb2.HealthCheckResponse(
                 alive=True,
                 item_count=len(self.items_by_id),
-                role="replica",
+                role=self.role,
             )
+        
+    def PromoteToPrimary(self, request, context):
+        with self.cv:
+            self.role = "primary"
+            print("I have been promoted to PRIMARY!")
+            return marketplace_pb2.PromotionResponse(success=True)
 
 
 def serve() -> None:

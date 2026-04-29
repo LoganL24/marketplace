@@ -30,7 +30,22 @@ service StorageReplica {
     rpc SyncFullState (StateRequest) returns (StateResponse);
     rpc ReplicateLog (ReplicationRequest) returns (ReplicationResponse);
     rpc Heartbeat (HealthCheckRequest) returns (HealthCheckResponse);
+    rpc PromoteToPrimary (PromotionRequest) returns (PromotionResponse);
 }
+
+service Controller {
+    rpc RegisterNode (RegisterRequest) returns (RegisterResponse);
+    rpc GetPrimary (GetPrimaryRequest) returns (GetPrimaryResponse);
+    rpc GetClusterInfo (ClusterInfoRequest) returns (ClusterInfoResponse);
+}
+
+message ClusterInfoRequest {}
+
+message ClusterInfoResponse {
+    bool success = 1;
+    repeated string node_addresses = 2;
+}
+
 
 message CreateItemRequest {
     Item item = 1;
@@ -154,4 +169,31 @@ message HealthCheckResponse {
     bool alive = 1;
     int32 item_count = 2;
     string role = 3;
+}
+
+message PromotionRequest {
+    string new_role = 1;
+}
+
+message PromotionResponse {
+    bool success = 1;
+}
+
+message RegisterRequest {
+    string address = 1;
+}
+
+message RegisterResponse {
+    bool success = 1;
+    bool is_primary = 2;
+}
+
+message GetPrimaryRequest {
+    string requester_id = 1;
+}
+
+message GetPrimaryResponse {
+    bool success = 1;
+    string primary_address = 2;
+    string message = 3;
 }
