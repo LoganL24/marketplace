@@ -1,22 +1,19 @@
 import os
 
-# --- Service Node Config ---
-# The port where the Marketplace API (the frontend) lives
-SERVICE_PORT = int(os.getenv("SERVICE_PORT", 50050))
+# --- General Network Config ---
+# In K8s, we'll set CONTROLLER_HOST to "controller-service"
+CONTROLLER_HOST = os.getenv("CONTROLLER_HOST", "localhost")
+CONTROLLER_PORT = os.getenv("CONTROLLER_PORT", "50050")
+CONTROLLER_ADDRESS = f"{CONTROLLER_HOST}:{CONTROLLER_PORT}"
 
-# --- Storage Node Config ---
-# Local port for the gRPC server to bind to
-NODE_PORT = int(os.getenv("NODE_PORT", 50051))
+# --- Node Specific Config ---
+# The port this specific container will listen on
+NODE_PORT = os.getenv("NODE_PORT", "50051")
 
-# --- Controller/Discovery Config ---
-CONTROLLER_HOST = os.getenv("CONTROLLER_HOST", "host.docker.internal")
-CONTROLLER_PORT = int(os.getenv("CONTROLLER_PORT", 50050))
-CONTROLLER_TARGET = f"{CONTROLLER_HOST}:{CONTROLLER_PORT}"
+# The IP or Hostname of THIS pod (K8s will provide this via POD_IP env)
+# If local, we just use localhost.
+MY_ADDRESS = os.getenv("POD_IP", "localhost")
 
-# --- Replication Config (Important for your Service Node) ---
-# These default to localhost for your current "Stage 1" testing
-STORAGE_PRIMARY_ADDR = os.getenv("STORAGE_PRIMARY_ADDR", "localhost:50051")
-STORAGE_BACKUP_ADDR = os.getenv("STORAGE_BACKUP_ADDR", "localhost:50052")
-
-DOCKER_IMAGE = "marketplace-node:latest"
-DOCKER_NETWORK = "marketplace-network"
+# --- Service Layer Config ---
+# The port the Marketplace (ServiceNode) listens on
+SERVICE_PORT = os.getenv("SERVICE_PORT", "50053")

@@ -7,7 +7,7 @@ import os
 
 from proto.src import marketplace_pb2, marketplace_pb2_grpc
 from proto.src.marketplace_pb2 import Item
-from src.utils.config import NODE_PORT
+from src.utils.config import CONTROLLER_ADDRESS, MY_ADDRESS, NODE_PORT
 
 
 class StorageNode(marketplace_pb2_grpc.StorageReplicaServicer):
@@ -18,12 +18,13 @@ class StorageNode(marketplace_pb2_grpc.StorageReplicaServicer):
         self.port = os.getenv("NODE_PORT", "50051")
         self.role = os.getenv("NODE_ROLE", "backup")
         self.peer_addresses = os.getenv("PEER_ADDRESSES", "").split(",")
+        self.my_full_address = f"{MY_ADDRESS}:{NODE_PORT}"
 
         try:
-            with grpc.insecure_channel("localhost:50050") as channel:
+            with grpc.insecure_channel(CONTROLLER_ADDRESS) as channel:
                 stub = marketplace_pb2_grpc.ControllerStub(channel)
                 # Register with the controller
-                resp = stub.RegisterNode(marketplace_pb2.RegisterRequest(address=f"localhost:{self.port}"))
+                resp = stub.RegisterNode(marketplace_pb2.RegisterRequest(address=self.my_full_address))
                 if resp.is_primary:
                     self.role = "primary"
                 else:
