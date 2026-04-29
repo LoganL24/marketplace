@@ -59,28 +59,71 @@ class ServiceNode(pb2_grpc.MarketplaceServicer):
         return pb2_grpc.StorageReplicaStub(channel), channel
 
 
-    def PutItem(self, request: pb2.PutRequest, context) -> pb2.PutResponse:
+    def CreateItem(self, request: pb2.CreateItemRequest, context) -> pb2.CreateItemResponse:
         """
-        Forward a write exclusively to the primary storage node.
-        The primary is responsible for replicating the write to all backups
-        (active replication) before acknowledging success.
+        Public API: Entry point for a client to add a new item.
+        Logic: Get Primary -> Call Storage.PutItem(is_update=False)
         """
         primary = self._get_primary_address()
         if not primary:
-            context.set_code(grpc.StatusCode.UNAVAILABLE)
-            context.set_details("No primary storage node available")
-            return pb2.PutResponse(success=False, message="No primary available")
+            return pb2.CreateItemResponse(ok=False, message="No primary storage available")
 
         try:
             stub, channel = self._storage_stub(primary)
             with channel:
-                response = stub.PutItem(request, timeout=5.0)
-                return response
+                # Map the Create request to the Storage Put request
+                storage_res = stub.PutItem(pb2.PutRequest(
+                    item=request.item,
+                    is_update=False,
+                    skip_consistency_check=False
+                ), timeout=5.0)
+
+                if storage_res.success:
+                    return pb2.CreateItemResponse(ok=True, item_id=request.item.item_id, message="Created successfully")
+                else:
+                    return pb2.CreateItemResponse(ok=False, message=storage_res.message)
+                
         except grpc.RpcError as e:
-            print(f"[ServiceNode] PutItem failed on primary {primary}: {e}")
-            context.set_code(grpc.StatusCode.UNAVAILABLE)
-            context.set_details(f"Primary unreachable: {e}")
-            return pb2.PutResponse(success=False, message="Primary unreachable")
+            print(f"[ServiceNode] CreateItem failed on primary {primary}: {e}")
+            return pb2.CreateItemResponse(ok=False, message=f"Storage error: {e.details()}")
+        
+    def UpdateItem(self, request: pb2.UpdateItemRequest, context) -> pb2.UpdateItemResponse:
+        """
+        Public API: Entry point for a client to update an existing item.
+        Logic: Get Primary -> Call Storage.PutItem(is_update=True)
+        """
+        primary = self._get_primary_address()
+        if not primary:
+            return pb2.UpdateItemResponse(ok=False, message="No primary storage available")
+
+        # Create a partial Item object for the update
+        updated_item = pb2.Item(
+            item_id=request.item_id,
+            seller_id=request.seller_id,
+            description=request.description,
+            quantity=request.quantity,
+            status=request.status,
+            version=request.expected_version # Send the version we THINK it is
+        )
+
+        try:
+            stub, channel = self._storage_stub(primary)
+            with channel:
+                # Map the Update request to the Storage Put request
+                storage_res = stub.PutItem(pb2.PutRequest(
+                    item=updated_item,
+                    is_update=True,
+                    skip_consistency_check=False
+                ), timeout=5.0)
+
+                if storage_res.success:
+                    return pb2.UpdateItemResponse(ok=True, new_version=storage_res.current_version, message="Updated successfully")
+                else:
+                    return pb2.UpdateItemResponse(ok=False, message=storage_res.message)
+
+        except grpc.RpcError as e:
+            print(f"[ServiceNode] UpdateItem failed on primary {primary}: {e}")
+            return pb2.UpdateItemResponse(ok=False, message=f"Storage error: {e.details()}")
 
     def QueryItems(self, request: pb2.QueryRequest, context) -> pb2.QueryResponse:
         """

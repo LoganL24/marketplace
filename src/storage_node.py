@@ -37,28 +37,38 @@ class StorageNode(marketplace_pb2_grpc.StorageReplicaServicer):
             item_id = request.item.item_id
             existing = self.items_by_id.get(item_id)
 
-            # Prevent older versions from overwriting newer data
-            if existing and not request.skip_consistency_check:
-                if request.item.version <= existing.version:
+            # Logic for NEW items
+            if not existing:
+                # Force starting version to 1 if not set
+                if request.item.version == 0:
+                    request.item.version = 1
+            
+            # Logic for UPDATES (Consistency Check)
+            elif not request.skip_consistency_check:
+                # The client must provide the version they CURRENTLY see
+                if request.item.version != existing.version:
                     return marketplace_pb2.PutResponse(
                         success=False,
                         current_version=existing.version,
-                        message="Stale write rejected",
+                        message=f"Stale write rejected. Storage has v{existing.version}, you sent v{request.item.version}",
                     )
+                
+                # Increment version for the successful update
+                request.item.version = existing.version + 1
 
-            # Local Save
+            # --- Local Save ---
             self.items_by_id[item_id] = request.item
             print(f"[{self.role.upper()}] Saved item: {item_id} (v{request.item.version})")
 
-            # Active Replication 
-            # If we are the primary, we must push this to all backups
+            # --- Active Replication ---
             if self.role == "primary":
                 replication_success = self.PropagateToBackups(request.item)
                 if not replication_success:
-                    # delete the local copy if replication fails to maintain perfect sync
+                    # Optional: Rollback local save if replication fails
+                    del self.items_by_id[item_id]
                     return marketplace_pb2.PutResponse(
                         success=False,
-                        current_version=request.item.version,
+                        current_version=existing.version if existing else 0,
                         message="Failed to replicate to backups",
                     )
 

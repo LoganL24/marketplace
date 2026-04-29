@@ -62,6 +62,15 @@ class Controller(pb2_grpc.ControllerServicer):
         # call in a separate thread/after loop to avoid holding lock
         threading.Thread(target=self.NotifyPromotion, args=(new_primary,)).start()
 
+    def GetClusterInfo(self, request, context):
+        """Returns all healthy nodes so Service Nodes can load balance reads."""
+        with self.lock:
+            # list(self.nodes.keys()) returns all currently tracked addresses
+            return pb2.ClusterInfoResponse(
+                success=True,
+                node_addresses=list(self.nodes.keys())
+            )
+
     def NotifyPromotion(self, address):
         try:
             with grpc.insecure_channel(address) as channel:
