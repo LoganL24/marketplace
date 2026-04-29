@@ -17,8 +17,17 @@ class StorageNode(marketplace_pb2_grpc.StorageReplicaServicer):
 
         self.port = os.getenv("NODE_PORT", "50051")
         self.role = os.getenv("NODE_ROLE", "backup")
-        self.peer_addresses = os.getenv("PEER_ADDRESSES", "").split(",")
-        self.my_full_address = f"{MY_ADDRESS}:{NODE_PORT}"
+        raw_peers = os.getenv("PEER_ADDRESSES", "")
+        self.peer_addresses = [p.strip() for p in raw_peers.split(",") if p.strip()]
+        raw_address = os.getenv("POD_IP", "localhost")
+
+        if "storage-" in raw_address and ".storage-service" not in raw_address:
+            self.my_full_address = f"{raw_address}.storage-service:{NODE_PORT}"
+        else:
+            if ":" in raw_address:
+                self.my_full_address = raw_address
+            else:
+                self.my_full_address = f"{raw_address}:{NODE_PORT}"
 
         try:
             with grpc.insecure_channel(CONTROLLER_ADDRESS) as channel:
@@ -80,22 +89,22 @@ class StorageNode(marketplace_pb2_grpc.StorageReplicaServicer):
             )
 
     def PropagateToBackups(self, item: Item) -> bool:
-        """Helper to send the item to all peers listed in PEER_ADDRESSES"""
         all_acks = True
         for addr in self.peer_addresses:
-            if not addr.strip(): continue
+            # EXACT match only
+            if addr == self.my_full_address:
+                print(f"Skipping replication to self ({addr})")
+                continue
+            
+            print(f"Attempting replication to backup: {addr}")
             try:
-                # short timeout so one slow backup doesn't hang the UI
                 with grpc.insecure_channel(addr) as channel:
                     stub = marketplace_pb2_grpc.StorageReplicaStub(channel)
-                    repl_req = marketplace_pb2.ReplicationRequest(item=item)
-                    
-                    response = stub.ReplicateLog(repl_req, timeout=2.0)
+                    response = stub.ReplicateLog(marketplace_pb2.ReplicationRequest(item=item), timeout=2.0)
                     if not response.success:
-                        print(f"Backup {addr} rejected replication.")
                         all_acks = False
             except Exception as e:
-                print(f"Connection failed to backup {addr}: {e}")
+                print(f"Replication to {addr} failed: {e}")
                 all_acks = False
         return all_acks
 
@@ -137,6 +146,7 @@ class StorageNode(marketplace_pb2_grpc.StorageReplicaServicer):
         self, request: marketplace_pb2.ReplicationRequest, context
     ) -> marketplace_pb2.ReplicationResponse:
         with self.cv:
+            print(f"[BACKUP] Received replication for {request.item.item_id} (v{request.item.version})")
             self.items_by_id[request.item.item_id] = request.item
             return marketplace_pb2.ReplicationResponse(
                 success=True,

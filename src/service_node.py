@@ -8,7 +8,8 @@ from proto.src import marketplace_pb2 as pb2
 from proto.src import marketplace_pb2_grpc as pb2_grpc
 from src.utils.config import NODE_PORT
 
-CONTROLLER_ADDRESS = os.getenv("CONTROLLER_ADDRESS", "localhost:50050")
+controller_host = os.getenv("CONTROLLER_HOST", "localhost")
+CONTROLLER_ADDRESS = f"{controller_host}:50050"
 SERVICE_PORT = os.getenv("SERVICE_PORT", NODE_PORT)
 
 
