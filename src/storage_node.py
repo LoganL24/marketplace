@@ -16,29 +16,34 @@ class StorageNode(marketplace_pb2_grpc.StorageReplicaServicer):
         self.items_by_id: dict[str, Item] = {}
 
         self.port = os.getenv("NODE_PORT", "50051")
-        self.role = os.getenv("NODE_ROLE", "backup")
+        self.role = os.getenv("NODE_ROLE", "backup") 
         raw_peers = os.getenv("PEER_ADDRESSES", "")
         self.peer_addresses = [p.strip() for p in raw_peers.split(",") if p.strip()]
         raw_address = os.getenv("POD_IP", "localhost")
 
+        # Handle address formatting
         if "storage-" in raw_address and ".storage-service" not in raw_address:
             self.my_full_address = f"{raw_address}.storage-service:{NODE_PORT}"
         else:
-            if ":" in raw_address:
-                self.my_full_address = raw_address
-            else:
-                self.my_full_address = f"{raw_address}:{NODE_PORT}"
+            self.my_full_address = raw_address if ":" in raw_address else f"{raw_address}:{NODE_PORT}"
 
         try:
             with grpc.insecure_channel(CONTROLLER_ADDRESS) as channel:
                 stub = marketplace_pb2_grpc.ControllerStub(channel)
-                # Register with the controller
+                
+                # 1. Register with the controller
                 resp = stub.RegisterNode(marketplace_pb2.RegisterRequest(address=self.my_full_address))
-                if resp.is_primary:
-                    self.role = "primary"
-                else:
-                    self.role = "backup"
+                self.role = "primary" if resp.is_primary else "backup"
                 print(f"Registered with Controller. Role assigned: {self.role.upper()}")
+
+                # 2. IF BACKUP: Ask Controller for the current Primary to sync state
+                if self.role == "backup":
+                    primary_resp = stub.GetPrimary(marketplace_pb2.Empty())
+                    if primary_resp.success and primary_resp.primary_address != self.my_full_address:
+                        self.sync_from_primary(primary_resp.primary_address)
+                    else:
+                        print("No primary found or I am the first node. Skipping initial sync.")
+
         except Exception as e:
             print(f"Could not connect to Controller: {e}. Defaulting to {self.role}")
 
@@ -168,6 +173,27 @@ class StorageNode(marketplace_pb2_grpc.StorageReplicaServicer):
             self.role = "primary"
             print("I have been promoted to PRIMARY!")
             return marketplace_pb2.PromotionResponse(success=True)
+        
+    def GetSnapshot(self, request, context):
+        with self.cv:
+            print(f"[PRIMARY] Providing snapshot to a joining backup...")
+            items_list = list(self.items_by_id.values())
+            return marketplace_pb2.SnapshotResponse(items=items_list)
+    
+    def sync_from_primary(self, primary_addr):
+        print(f"[BACKUP] Attempting to sync state from {primary_addr}...")
+        try:
+            # Use a longer timeout for the full snapshot than a single write
+            with grpc.insecure_channel(primary_addr) as channel:
+                stub = marketplace_pb2_grpc.StorageReplicaStub(channel)
+                response = stub.GetSnapshot(marketplace_pb2.Empty(), timeout=10.0)
+                
+                for item in response.items:
+                    self.items_by_id[item.item_id] = item
+                    
+                print(f"[BACKUP] Sync complete. Loaded {len(response.items)} items.")
+        except Exception as e:
+            print(f"[BACKUP] Sync failed: {e}")
 
 
 def serve() -> None:

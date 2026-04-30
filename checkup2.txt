@@ -1,0 +1,5 @@
+Q3.A
+
+Failures will detected by the controller checking for a heartbeat/response from all storage nodes consistently. With Kubernetes this can also be implemented by the controler service with a liveliness probe.
+When a node dies, that node is removed from the cluster by the controller and if the node was the primary node, a new primary is elected from the backup nodes.
+Data is recovered/maintained through versioning. If a node dies and comes back alive with a failed state, 
