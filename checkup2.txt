@@ -1,0 +1,11 @@
+Q3.A
+
+Failures will detected by the controller checking for a heartbeat/response from all storage nodes consistently. With Kubernetes this can also be implemented by the controler service with a liveliness probe.
+When a node dies, that node is removed from the cluster by the controller and if the node was the primary node, a new primary is elected from the backup nodes.
+Data is recovered/maintained through versioning. If a node dies and comes back alive from a failed state, it will sync with the primary (latest versions of items).
+
+Q3.B 
+
+We will track latency (average speed of writes), throughput (requests per second), consistency (rejection rate) and availability (time to recover).
+To test many clients at once, we will use Python's multithreading to test many workers at once.
+To test scaling, we will run the marketplace with different number of service node replicas, different number of storage nodes, and killing the primary node with different loads.

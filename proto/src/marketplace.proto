@@ -31,6 +31,7 @@ service StorageReplica {
     rpc ReplicateLog (ReplicationRequest) returns (ReplicationResponse);
     rpc Heartbeat (HealthCheckRequest) returns (HealthCheckResponse);
     rpc PromoteToPrimary (PromotionRequest) returns (PromotionResponse);
+    rpc GetSnapshot(Empty) returns (SnapshotResponse);
 }
 
 service Controller {
@@ -177,6 +178,12 @@ message PromotionRequest {
 
 message PromotionResponse {
     bool success = 1;
+}
+
+message Empty {}
+
+message SnapshotResponse {
+  repeated Item items = 1;
 }
 
 message RegisterRequest {

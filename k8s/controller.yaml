@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: controller
+  template:
+    metadata:
+      labels:
+        app: controller
+    spec:
+      containers:
+      - name: controller
+        image: marketplace-app:latest
+        imagePullPolicy: IfNotPresent
+        command: ["python", "-m", "src.controller"]
+        env:
+        - name: CONTROLLER_PORT
+          value: "50050"
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        ports:
+        - containerPort: 50050
+        livenessProbe:
+          tcpSocket:
+            port: 50050 
+          initialDelaySeconds: 5
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: controller-service
+spec:
+  selector:
+    app: controller
+  ports:
+    - protocol: TCP
+      port: 50050
+      targetPort: 50050
+  type: LoadBalancer
