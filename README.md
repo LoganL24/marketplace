@@ -52,3 +52,12 @@ python -m src.service_node
 # Connects to controller on localhost:50050
 # Listens for client requests on port 50053
 ```
+
+## Running Tests
+
+All tests are in the `tests/` directory and can be run with Python's built-in `unittest` runner (virtual environment must be active and gRPC stubs must be generated).
+
+### Run all the unit tests
+
+```bash
+python -m unittest discover -s tests -v
