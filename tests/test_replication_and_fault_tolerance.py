@@ -408,9 +408,9 @@ class TestFaultTolerance:
                        return_value=ctrl_stub):
                 with patch("proto.src.marketplace_pb2_grpc.StorageReplicaStub",
                            return_value=dead_stub):
-                    resp = svc.PutItem(pb2.PutRequest(item=_item()), ctx)
+                    resp = svc.CreateItem(pb2.CreateItemRequest(item=_item()), ctx)
 
-        assert resp.success is False
+        assert resp.ok is False
         ctx.set_code.assert_called_with(grpc.StatusCode.UNAVAILABLE)
 
     # --- Controller notification of new primary ---
