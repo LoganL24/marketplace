@@ -60,16 +60,13 @@ class StorageNode(marketplace_pb2_grpc.StorageReplicaServicer):
             
             # Logic for UPDATES (Consistency Check)
             elif not request.skip_consistency_check:
-                # The client must provide the version they CURRENTLY see
-                if request.item.version != existing.version:
+                # The client must send a version strictly greater than what's stored
+                if request.item.version <= existing.version:
                     return marketplace_pb2.PutResponse(
                         success=False,
                         current_version=existing.version,
                         message=f"Stale write rejected. Storage has v{existing.version}, you sent v{request.item.version}",
                     )
-                
-                # Increment version for the successful update
-                request.item.version = existing.version + 1
 
             # --- Local Save ---
             self.items_by_id[item_id] = request.item

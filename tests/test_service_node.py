@@ -161,9 +161,9 @@ class TestPutItem:
                        return_value=ctrl_stub):
                 with patch("proto.src.marketplace_pb2_grpc.StorageReplicaStub",
                            return_value=stor_stub):
-                    resp = svc.PutItem(pb2.PutRequest(item=item), ctx)
+                    resp = svc.CreateItem(pb2.CreateItemRequest(item=item), ctx)
 
-        assert resp.success is True
+        assert resp.ok is True
         stor_stub.PutItem.assert_called_once()
 
     def test_put_item_returns_unavailable_when_no_primary(self):
@@ -175,9 +175,9 @@ class TestPutItem:
         with patch("grpc.insecure_channel", return_value=ctrl_ch):
             with patch("proto.src.marketplace_pb2_grpc.ControllerStub",
                        return_value=ctrl_stub):
-                resp = svc.PutItem(pb2.PutRequest(item=_item()), ctx)
+                resp = svc.CreateItem(pb2.CreateItemRequest(item=_item()), ctx)
 
-        assert resp.success is False
+        assert resp.ok is False
         ctx.set_code.assert_called_with(grpc.StatusCode.UNAVAILABLE)
 
     def test_put_item_returns_unavailable_when_primary_unreachable(self):
@@ -203,9 +203,9 @@ class TestPutItem:
                        return_value=ctrl_stub):
                 with patch("proto.src.marketplace_pb2_grpc.StorageReplicaStub",
                            return_value=mock_stor_stub):
-                    resp = svc.PutItem(pb2.PutRequest(item=_item()), ctx)
+                    resp = svc.CreateItem(pb2.CreateItemRequest(item=_item()), ctx)
 
-        assert resp.success is False
+        assert resp.ok is False
         ctx.set_code.assert_called_with(grpc.StatusCode.UNAVAILABLE)
 
 

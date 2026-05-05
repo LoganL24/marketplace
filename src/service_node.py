@@ -67,6 +67,8 @@ class ServiceNode(pb2_grpc.MarketplaceServicer):
         """
         primary = self._get_primary_address()
         if not primary:
+            context.set_code(grpc.StatusCode.UNAVAILABLE)
+            context.set_details("No primary storage available")
             return pb2.CreateItemResponse(ok=False, message="No primary storage available")
 
         try:
@@ -86,7 +88,9 @@ class ServiceNode(pb2_grpc.MarketplaceServicer):
                 
         except grpc.RpcError as e:
             print(f"[ServiceNode] CreateItem failed on primary {primary}: {e}")
-            return pb2.CreateItemResponse(ok=False, message=f"Storage error: {e.details()}")
+            context.set_code(grpc.StatusCode.UNAVAILABLE)
+            context.set_details(f"Storage error: {e}")
+            return pb2.CreateItemResponse(ok=False, message=f"Storage error: {e}")
         
     def UpdateItem(self, request: pb2.UpdateItemRequest, context) -> pb2.UpdateItemResponse:
         """
@@ -104,7 +108,7 @@ class ServiceNode(pb2_grpc.MarketplaceServicer):
             description=request.description,
             quantity=request.quantity,
             status=request.status,
-            version=request.expected_version # Send the version we THINK it is
+            version=request.expected_version + 1  # Send the new version (expected current + 1)
         )
 
         try:
