@@ -61,3 +61,16 @@ All tests are in the `tests/` directory and can be run with Python's built-in `u
 
 ```bash
 python -m unittest discover -s tests -v
+```
+
+### Integration test scripts (requires a running system)
+
+```bash
+# Full create / update / optimistic-locking test against localhost:50053
+python test_full_system.py
+
+# Backend-only test (storage + controller, no service node)
+python test_backend_only.py
+
+# PUT stress test
+python test_put.py
