@@ -43,11 +43,22 @@ if not os.path.exists(os.path.join(_proto_dir, "marketplace_pb2.py")):
 import contextlib
 import io
 
+import math
+
 import grpc
 from proto.src import marketplace_pb2 as pb2
 from proto.src import marketplace_pb2_grpc as pb2_grpc
 from src.controller import Controller
 from src.service_node import ServiceNode
+
+US_PER_SECOND = 1_000_000  # microseconds per second
+
+
+def _percentile(sorted_data: list, p: float) -> float:
+    """Return the p-th percentile (0 < p <= 1) of a pre-sorted list."""
+    n = len(sorted_data)
+    idx = max(0, math.ceil(p * n) - 1)
+    return sorted_data[idx]
 
 
 @contextlib.contextmanager
@@ -231,20 +242,18 @@ def _count_tests(filepath):
 BENCH_ITERATIONS = 500
 
 
-def _benchmark(fn, n=BENCH_ITERATIONS):
+def _benchmark(fn, iterations=BENCH_ITERATIONS):
     latencies = []
     success = 0
-    for _ in range(n):
+    for _ in range(iterations):
         t0 = time.perf_counter()
         ok = fn()
-        elapsed_us = (time.perf_counter() - t0) * 1_000_000  # microseconds
+        elapsed_us = (time.perf_counter() - t0) * US_PER_SECOND
         latencies.append(elapsed_us)
         if ok:
             success += 1
     latencies.sort()
-    p50 = latencies[int(0.50 * n) - 1]
-    p95 = latencies[int(0.95 * n) - 1]
-    p99 = latencies[int(0.99 * n) - 1]
+    n = iterations
     return {
         "n": n,
         "success": success,
@@ -252,9 +261,9 @@ def _benchmark(fn, n=BENCH_ITERATIONS):
         "mean_us": f"{mean(latencies):.1f}",
         "median_us": f"{median(latencies):.1f}",
         "stdev_us": f"{stdev(latencies):.1f}" if n > 1 else "0.0",
-        "p50_us": f"{p50:.1f}",
-        "p95_us": f"{p95:.1f}",
-        "p99_us": f"{p99:.1f}",
+        "p50_us": f"{_percentile(latencies, 0.50):.1f}",
+        "p95_us": f"{_percentile(latencies, 0.95):.1f}",
+        "p99_us": f"{_percentile(latencies, 0.99):.1f}",
         "min_us": f"{min(latencies):.1f}",
         "max_us": f"{max(latencies):.1f}",
     }
@@ -311,11 +320,11 @@ def bench_storage_node():
     # --- PutItem (no replication, backup role) ---
     node_b = _make_storage_node(role="backup", peer_addresses="", register_as_primary=False)
 
-    counter = {"v": 0}
+    item_count = {"n": 0}
 
     def do_put():
-        counter["v"] += 1
-        iid = f"item-{counter['v']}"
+        item_count["n"] += 1
+        iid = f"item-{item_count['n']}"
         r = node_b.PutItem(pb2.PutRequest(item=_item(item_id=iid, version=1)), ctx)
         return r.success
 
@@ -332,11 +341,11 @@ def bench_storage_node():
     repl_ch.__enter__ = MagicMock(return_value=repl_ch)
     repl_ch.__exit__ = MagicMock(return_value=False)
 
-    pcounter = {"v": 0}
+    primary_item_count = {"n": 0}
 
     def do_put_primary():
-        pcounter["v"] += 1
-        iid = f"pitem-{pcounter['v']}"
+        primary_item_count["n"] += 1
+        iid = f"pitem-{primary_item_count['n']}"
         with patch("grpc.insecure_channel", return_value=repl_ch):
             with patch("proto.src.marketplace_pb2_grpc.StorageReplicaStub",
                        return_value=repl_stub):
@@ -347,11 +356,11 @@ def bench_storage_node():
 
     # --- ReplicateLog ---
     node_r = _make_storage_node(role="backup", register_as_primary=False)
-    rcounter = {"v": 0}
+    repl_item_count = {"n": 0}
 
     def do_replicate():
-        rcounter["v"] += 1
-        iid = f"ritem-{rcounter['v']}"
+        repl_item_count["n"] += 1
+        iid = f"ritem-{repl_item_count['n']}"
         r = node_r.ReplicateLog(pb2.ReplicationRequest(item=_item(item_id=iid, version=1)), ctx)
         return r.success
 
@@ -448,7 +457,7 @@ def stress_test():
             t0 = time.perf_counter()
             try:
                 r = node.PutItem(pb2.PutRequest(item=_item(item_id=iid, version=1)), ctx)
-                elapsed_us = (time.perf_counter() - t0) * 1_000_000
+                elapsed_us = (time.perf_counter() - t0) * US_PER_SECOND
                 with lock:
                     latencies.append((elapsed_us, r.success))
             except Exception as e:
@@ -479,9 +488,9 @@ def stress_test():
         "throughput_ops_s": f"{total_ops / total_time_s:.1f}",
         "mean_us": f"{mean(lat_vals):.1f}",
         "stdev_us": f"{stdev(lat_vals):.1f}" if n > 1 else "0.0",
-        "p50_us": f"{lat_vals[int(0.50 * n) - 1]:.1f}",
-        "p95_us": f"{lat_vals[int(0.95 * n) - 1]:.1f}",
-        "p99_us": f"{lat_vals[int(0.99 * n) - 1]:.1f}",
+        "p50_us": f"{_percentile(lat_vals, 0.50):.1f}",
+        "p95_us": f"{_percentile(lat_vals, 0.95):.1f}",
+        "p99_us": f"{_percentile(lat_vals, 0.99):.1f}",
         "min_us": f"{min(lat_vals):.1f}",
         "max_us": f"{max(lat_vals):.1f}",
     }
