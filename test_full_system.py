@@ -4,11 +4,11 @@ from proto.src import marketplace_pb2_grpc as pb2_grpc
 import uuid
 
 def run_test():
-    # Connect to the SERVICE NODE (Port 50053)
+    # Connect to the SERVICE NODE
     channel = grpc.insecure_channel('localhost:50053')
     stub = pb2_grpc.MarketplaceStub(channel)
 
-    print("🚀 Starting Full System Integration Test...")
+    print("Starting Full System Integration Test...")
 
     unique_id = f"item_{uuid.uuid4().hex[:8]}"
     # 1. Test CreateItem
@@ -26,24 +26,24 @@ def run_test():
     print(f"Result: {create_res.message} (OK: {create_res.ok})")
 
     # 2. Test UpdateItem (Success Case)
-    print("\n🆙 Phase 2: Updating Item (Correct Version)...")
+    print("\nPhase 2: Updating Item (Correct Version)...")
     update_res = stub.UpdateItem(pb2.UpdateItemRequest(
         item_id=unique_id,
         seller_id="user_A",
         description="Updated: High performance + Free Mouse",
         quantity=1,
         status="ACTIVE",
-        expected_version=1 # Initial version is usually 0
+        expected_version=1
     ))
     print(f"Result: {update_res.message} (New Version: {update_res.new_version})")
 
     # 3. Test UpdateItem (Conflict Case)
-    print("\n⚠️ Phase 3: Testing Optimistic Locking (Wrong Version)...")
+    print("\nTesting Optimistic Locking (Wrong Version)...")
     fail_res = stub.UpdateItem(pb2.UpdateItemRequest(
         item_id=unique_id,
         seller_id="user_A",
         description="This should fail",
-        expected_version=0 # We already updated it to 1, so 0 is now old
+        expected_version=0
     ))
     print(f"Result: {fail_res.message} (OK: {fail_res.ok})")
 

@@ -68,15 +68,15 @@ class StorageNode(marketplace_pb2_grpc.StorageReplicaServicer):
                         message=f"Stale write rejected. Storage has v{existing.version}, you sent v{request.item.version}",
                     )
 
-            # --- Local Save ---
+            #Local Save
             self.items_by_id[item_id] = request.item
             print(f"[{self.role.upper()}] Saved item: {item_id} (v{request.item.version})")
 
-            # --- Active Replication ---
+            #Active Replication
             if self.role == "primary":
                 replication_success = self.PropagateToBackups(request.item)
                 if not replication_success:
-                    # Optional: Rollback local save if replication fails
+                    #Rollback local save if replication fails
                     del self.items_by_id[item_id]
                     return marketplace_pb2.PutResponse(
                         success=False,
@@ -90,6 +90,7 @@ class StorageNode(marketplace_pb2_grpc.StorageReplicaServicer):
                 message=f"Item stored and replicated via {self.role}",
             )
 
+    #Push data updates to backups
     def PropagateToBackups(self, item: Item) -> bool:
         all_acks = True
         for addr in self.peer_addresses:
@@ -110,6 +111,7 @@ class StorageNode(marketplace_pb2_grpc.StorageReplicaServicer):
                 all_acks = False
         return all_acks
 
+    #Search for relevant items in storage
     def QueryItems(self, request: marketplace_pb2.QueryRequest, context) -> marketplace_pb2.QueryResponse:
         with self.cv:
             filter_text = request.filter.strip().lower()
@@ -132,6 +134,7 @@ class StorageNode(marketplace_pb2_grpc.StorageReplicaServicer):
                 items_found=len(matches),
             )
 
+    #Sync state between storage nodes
     def SyncFullState(
         self, request: marketplace_pb2.StateRequest, context
     ) -> marketplace_pb2.StateResponse:
@@ -155,6 +158,7 @@ class StorageNode(marketplace_pb2_grpc.StorageReplicaServicer):
                 ack_version=request.item.version,
             )
 
+    #check for pulse
     def Heartbeat(
         self, request: marketplace_pb2.HealthCheckRequest, context
     ) -> marketplace_pb2.HealthCheckResponse:

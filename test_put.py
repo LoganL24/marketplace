@@ -2,7 +2,7 @@ import grpc
 from proto.src import marketplace_pb2, marketplace_pb2_grpc
 
 def run():
-    # Connect to the PRIMARY (50051)
+    # Connect to the Primary
     with grpc.insecure_channel('localhost:50051') as channel:
         stub = marketplace_pb2_grpc.StorageReplicaStub(channel)
         
