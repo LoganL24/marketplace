@@ -173,6 +173,7 @@ def serve() -> None:
     pb2_grpc.add_MarketplaceServicer_to_server(ServiceNode(), server)
     server.add_insecure_port(f"[::]:{SERVICE_PORT}")
     print(f"Service node gRPC server starting on port {SERVICE_PORT}...")
+    print(f"Connecting to controller at {CONTROLLER_ADDRESS}...", flush=True)
     server.start()
     server.wait_for_termination()
 

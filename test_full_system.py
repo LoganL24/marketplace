@@ -1,6 +1,7 @@
 import grpc
 from proto.src import marketplace_pb2 as pb2
 from proto.src import marketplace_pb2_grpc as pb2_grpc
+import uuid
 
 def run_test():
     # Connect to the SERVICE NODE (Port 50053)
@@ -9,10 +10,11 @@ def run_test():
 
     print("🚀 Starting Full System Integration Test...")
 
+    unique_id = f"item_{uuid.uuid4().hex[:8]}"
     # 1. Test CreateItem
     print("\n📝 Phase 1: Creating Item...")
     item = pb2.Item(
-        item_id="item_001",
+        item_id=unique_id,
         seller_id="user_A",
         title="Gaming Laptop",
         description="High performance",
@@ -26,7 +28,7 @@ def run_test():
     # 2. Test UpdateItem (Success Case)
     print("\n🆙 Phase 2: Updating Item (Correct Version)...")
     update_res = stub.UpdateItem(pb2.UpdateItemRequest(
-        item_id="item_001",
+        item_id=unique_id,
         seller_id="user_A",
         description="Updated: High performance + Free Mouse",
         quantity=1,
@@ -38,7 +40,7 @@ def run_test():
     # 3. Test UpdateItem (Conflict Case)
     print("\n⚠️ Phase 3: Testing Optimistic Locking (Wrong Version)...")
     fail_res = stub.UpdateItem(pb2.UpdateItemRequest(
-        item_id="item_001",
+        item_id=unique_id,
         seller_id="user_A",
         description="This should fail",
         expected_version=0 # We already updated it to 1, so 0 is now old
